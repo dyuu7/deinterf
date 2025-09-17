@@ -214,7 +214,7 @@ if __name__ == "__main__":
 This project exists thanks to all the people who contribute. Thank you to our wonderful contributors:
 
 <a href="https://github.com/dorian-li/deinterf/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=dorian-li/deinterf" />
+  <img src="https://contrib.rocks/image?repo=dyuu7/deinterf" />
 </a>
 
 ## Licensing
