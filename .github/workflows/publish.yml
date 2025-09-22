@@ -1,0 +1,20 @@
+name: Publish (uv + hatch-vcs)
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - run: uv publish

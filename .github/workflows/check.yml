@@ -1,0 +1,42 @@
+name: Package check (uv)
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+    tags: [ "v*.*.*" ]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-latest:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - name: Smoke (wheel)
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import deinterf; print(deinterf.__version__)"
+      - name: Smoke (sdist)
+        run: uv run --isolated --no-project --with dist/*.tar.gz python -c "import deinterf; print('sdist ok')"
+
+  smoke-matrix:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv build
+      - name: Smoke (wheel)
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import deinterf; print(deinterf.__version__)"
+      - name: Smoke (sdist)
+        run: uv run --isolated --no-project --with dist/*.tar.gz python -c "import deinterf; print('sdist ok')"
