@@ -1,33 +1,66 @@
-# Project Metadata
 [project]
 name = "deinterf"
-version = "1.1.0"
-description = "Aeromagnetic Data Compensation for Magnetic Interference"
-readme = "README.md"
+dynamic = ["version"]
+description = "Aeromagnetic interference compensation based on the Tolles–Lawson (T-L) model. Modular IoC pipeline with a scikit-style API."
+readme = { file = "README.md", content-type = "text/markdown" }
 
 # Requirements
 requires-python = ">=3.9"
 dependencies = [
-    "numpy>=1.26.4", 
-    "scipy>=1.12.0", 
+    "numpy>=1.26.4",
+    "scipy>=1.12.0",
     "scikit-learn>=1.4.0",
-    "typing-extensions>=4.10.0",
+    "typing-extensions>=4.10.0; python_version < '3.11'",
     "sgl2020>=0.1.1",
-    "matplotlib>=3.8.3",
-    "ppigrf==1.0.2"
+    "ppigrf>=1.0.2",
 ]
 
 # Author Info
-authors = [ { name = "dorian", email = "dorian.li@outlook.com" } ]
+authors = [{ name = "dyuu7" }]
+license = { text = "MIT" }
 
 # Project Classifiers
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
 
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8.3"]
+
+[project.urls]
+Homepage = "https://github.com/dyuu7/deinterf"
+Repository = "https://github.com/dyuu7/deinterf"
+Issues = "https://github.com/dyuu7/deinterf/issues"
+
 # Build System
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.18", "hatch-vcs>=0.5"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# 只在打了 vX.Y.Z 标签时产出干净版本；避免 +gHASH 本地后缀
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+# 构建时写入运行时可读版本
+version-file = "deinterf/_version.py"
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov"]
+lint = ["ruff", "mypy"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["deinterf"]
+include = ["deinterf/py.typed"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/.github", "/tests", "/docs", "/examples"]
