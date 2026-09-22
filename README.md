@@ -13,45 +13,120 @@ Based on the Tolles-Lawson (T-L) aeromagnetic compensation model, this tool comp
 
 ## Getting started
 
-`deinterf` can be installed using pip, tested on python 3.9:
+`deinterf` requires Python 3.10 or newer:
 
 ```shell
 pip install deinterf
 ```
 
+The core package accepts your own NumPy-compatible sensor data and uses
+[`dataioc`](https://github.com/dyuu7/dataioc) for data dependencies. To run the
+flight-data examples below, install their data reader, plotting and IGRF dependencies:
+
+```shell
+pip install "deinterf[examples]"
+```
+
+For development from this checkout (including all example tests):
+
+```shell
+uv sync --extra examples
+uv run --extra examples pytest
+```
+
+With only `uv sync` and `uv run pytest`, the core tests run and the optional
+example tests are skipped. Tests use synthetic local flight files and do not
+download data.
+
+## Python compatibility
+
+The supported range is CPython 3.10–3.14 (standard builds with the GIL).
+CI checks both the core installation and the `examples` extra:
+
+| Platform | Python versions |
+| --- | --- |
+| Linux x86_64 | 3.10, 3.11, 3.12, 3.13, 3.14 |
+| Windows x86_64 | 3.10, 3.14 |
+| macOS ARM64 | 3.10, 3.14 |
+
+Release checks use `uv.lock`, require wheels for third-party runtime dependencies,
+and test built wheels and source distributions outside the checkout on Linux
+with Python 3.10 and 3.14. Separate checks resolve the lowest direct dependencies
+on 3.10 and the latest compatible dependencies on 3.10 and 3.14.
+
+A weekly workflow repeats dependency checks and probes the latest stable CPython.
+A successful probe alone does not extend the supported range: new Python versions
+must be added to the release matrix. Dependency updates should change the lockfile
+deliberately and pass the same release checks.
+
+## Migration
+
+- Import container types directly from `dataioc`; `deinterf.utils.data_ioc`
+  and its private modules have been removed.
+- Replace `sgl2020.Sgl2020` queries with `dafmit_aeromag.Dataset` and `Selection`,
+  specifying the flight and requested columns explicitly.
+- Install `deinterf[examples]` for flight-data examples. `dafmit-aeromag`,
+  `matplotlib` and `ppigrf` are optional; the former `plot` extra is replaced by
+  `examples`.
+- Python 3.10 or newer is required.
+
+## Versioning
+
+Git tags (`vX.Y.Z`) are the version source. `hatch-vcs` derives release and
+development versions when building the package. `deinterf.__version__` reads
+the installed package metadata through `importlib.metadata`; no version file
+is generated or maintained in the source tree.
+
+Install the project before importing it. After changing commits or tags, refresh
+the version metadata of an editable installation with:
+
+```shell
+uv sync --extra examples --reinstall-package deinterf
+```
+
+CI fetches the full Git history and tags before installing or building.
+
 ## Use Cases
+
+Flight data is loaded through
+[`dafmit-aeromag`](https://github.com/dyuu7/dafmit-aeromag), which replaces
+`sgl2020`. `Dataset.read(Selection(...), columns=...)` returns a DataFrame;
+the examples explicitly select `split="train"` for calibration line `1002.02`
+in flight `1002`. Source field names and units are preserved, and `year`/`doy`
+come from the reader's identity columns. The examples use 10 Hz sampling.
+On first use, the reader downloads and verifies the flight file in its own cache.
+Use `Dataset(data_dir=..., offline=True)` to read an existing verified cache;
+see the reader's documentation for data access and dataset terms.
+
+The data container is now the independent
+[`dataioc`](https://github.com/dyuu7/dataioc) package, primarily implemented by
+[yanang007](https://github.com/yanang007), with the original idea proposed by
+[dyuu7](https://github.com/dyuu7). `deinterf` uses its NumPy extra and public API.
+Register all inputs and providers before evaluating a container; create a new
+container when changing inputs or providers, since computed values are cached.
 
 Classical T-L compensation:
 
 ```python
 
 import matplotlib.pyplot as plt
-from sgl2020 import Sgl2020
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC
 
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
 from deinterf.foundation.sensors import MagVector, Tmi
 from deinterf.metrics.fom import improve_rate, noise_level
-from deinterf.utils.data_ioc import DataIoC
 
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_b_x",
-                "flux_b_y",
-                "flux_b_z",
-                "mag_3_uc",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=["flux_b_x", "flux_b_y", "flux_b_z", "mag_3_uc"],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     # prepare data
     tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])
-    fom_data = DataIoC().add(
+    fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_b_x"], by=flt_d["flux_b_y"], bz=flt_d["flux_b_z"])
     )
 
@@ -85,6 +160,9 @@ if __name__ == "__main__":
 
 Using "direction cosines calculated by the inertial navigation system (INS) instead of the magnetic vector" as an example, this section demonstrates how to extend or modify the classic T-L model:
 
+This example uses the default IGRF14 model in `ppigrf>=2.1,<3`.
+Its results can differ from earlier versions of the example that used IGRF13.
+
 ```python
 from datetime import datetime, timedelta
 from typing import NamedTuple
@@ -92,14 +170,14 @@ from typing import NamedTuple
 import matplotlib.pyplot as plt
 import numpy as np
 import ppigrf
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC, DataNDArray, UniqueData
 from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation as R
-from sgl2020 import Sgl2020
 
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
 from deinterf.foundation.sensors import DirectionalCosine, MagVector, Tmi
 from deinterf.metrics.fom import improve_rate
-from deinterf.utils.data_ioc import DataIoC, DataNDArray, UniqueData
 from deinterf.utils.transform import magvec2dircosine
 
 
@@ -152,29 +230,25 @@ class InsDirectionalCosine(DirectionalCosine):
 
 
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_d_x",
-                "flux_d_y",
-                "flux_d_z",
-                "mag_3_uc",
-                "ins_yaw",
-                "ins_pitch",
-                "ins_roll",
-                "lon",
-                "lat",
-                "utm_z",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=[
+            "flux_d_x",
+            "flux_d_y",
+            "flux_d_z",
+            "mag_3_uc",
+            "ins_yaw",
+            "ins_pitch",
+            "ins_roll",
+            "lon",
+            "lat",
+            "utm_z",
+        ],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     # date of flt1002
-    year, doy = 2020, 172
+    year, doy = int(flt_d["year"].iloc[0]), int(flt_d["doy"].iloc[0])
 
     # classic compensation
     tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])

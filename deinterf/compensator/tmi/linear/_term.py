@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
+from dataioc import DataIoC
 
 from deinterf.foundation import ComposableTerm
 from deinterf.foundation.sensors import DirectionalCosine, MagIntensity
-from deinterf.utils.data_ioc import DataIoC
 
 
 class Permanent(ComposableTerm):

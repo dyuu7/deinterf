@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+from dataioc import DataIoC, DataNDArray
 from numpy.typing import ArrayLike
 
-from deinterf.utils.data_ioc import DataNDArray, DataIoC
 from deinterf.utils.transform import magvec2dircosine, magvec2intensity
 
 

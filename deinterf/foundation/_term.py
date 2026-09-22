@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 import numpy as np
-
-from deinterf.utils.data_ioc import DataDescriptor, DataIoC
+from dataioc import DataDescriptor, DataIoC
 
 
 class ComposableTerm(DataDescriptor[np.ndarray]):

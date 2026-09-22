@@ -1,23 +1,24 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from sgl2020 import Sgl2020
-from deinterf.foundation import ComposableTerm
-from deinterf.foundation.sensors import MagIntensity, DirectionalCosine
-from deinterf.foundation.sensors import MagVector, Tmi
-from deinterf.metrics.fom import improve_rate, noise_level
+import numpy as np
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC
+
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
-from deinterf.utils.data_ioc import DataIoC
+from deinterf.foundation import ComposableTerm
+from deinterf.foundation.sensors import DirectionalCosine, MagIntensity, MagVector, Tmi
+from deinterf.metrics.fom import improve_rate
+
 
 class LoadVibration(ComposableTerm):
     def __build__(self, container: DataIoC) -> np.ndarray:
         intensity = container[MagIntensity]
         direction_cos = container[DirectionalCosine]
         dcx, dcy, dcz = direction_cos.T
-        
-        dcx_derivative = np.gradient(dcx) 
+
+        dcx_derivative = np.gradient(dcx)
         dcy_derivative = np.gradient(dcy)
         dcz_derivative = np.gradient(dcz)
-        
+
         # Third-order directional cosine terms (10 features)
         triple_direction_terms = intensity[:, None] * np.column_stack(
             (
@@ -28,12 +29,12 @@ class LoadVibration(ComposableTerm):
                 dcx * dcy * dcz,
                 dcx * dcz * dcz,
                 dcy * dcy * dcy,
-                dcy * dcy * dcz, 
+                dcy * dcy * dcz,
                 dcy * dcz * dcz,
                 dcz * dcz * dcz,
             )
         )
-        
+
         # Second-order directional cosine and derivative terms (18 features)
         double_direction_derivative_terms = intensity[:, None] * np.column_stack(
             (
@@ -57,38 +58,34 @@ class LoadVibration(ComposableTerm):
                 dcz * dcz * dcz_derivative,
             )
         )
-        
+
         # First-order derivative terms (3 features)
         derivative_terms = intensity[:, None] * np.column_stack(
             (
                 dcx_derivative,
-                dcy_derivative, 
+                dcy_derivative,
                 dcz_derivative,
             )
         )
-        
-        return np.column_stack((triple_direction_terms, 
-                              double_direction_derivative_terms, 
-                              derivative_terms))
+
+        return np.column_stack(
+            (
+                triple_direction_terms,
+                double_direction_derivative_terms,
+                derivative_terms,
+            )
+        )
+
 
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_d_x",
-                "flux_d_y",
-                "flux_d_z",
-                "mag_5_uc",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=["flux_d_x", "flux_d_y", "flux_d_z", "mag_5_uc"],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     tmi_with_interf = Tmi(tmi=flt_d["mag_5_uc"])
-    fom_data = DataIoC().add(
+    fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"])
     )
 

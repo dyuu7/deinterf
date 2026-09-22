@@ -1,14 +1,15 @@
-import numpy as np
-from numpy.typing import ArrayLike
 import matplotlib.pyplot as plt
-from sgl2020 import Sgl2020
-from deinterf.foundation import ComposableTerm
-from deinterf.foundation.sensors import MagIntensity, DirectionalCosine
-from deinterf.foundation.sensors import MagVector, Tmi
-from deinterf.metrics.fom import improve_rate, noise_level
-from deinterf.compensator.tmi.linear import Terms, TollesLawson
-from deinterf.utils.data_ioc import DataIoC, DataNDArray
+import numpy as np
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC, DataNDArray
+from numpy.typing import ArrayLike
 from scipy.signal import butter, filtfilt
+
+from deinterf.compensator.tmi.linear import Terms, TollesLawson
+from deinterf.foundation import ComposableTerm
+from deinterf.foundation.sensors import DirectionalCosine, MagVector, Tmi
+from deinterf.metrics.fom import improve_rate
+
 
 class Current(DataNDArray):
     def __new__(cls, current: ArrayLike, fs=10):
@@ -26,41 +27,35 @@ class Cable(ComposableTerm):
         ret2 = current_dot[:, None] * dcos
         return np.column_stack((ret1, ret2))
 
+
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_d_x",
-                "flux_d_y",
-                "flux_d_z",
-                "mag_5_uc",
-                "ins_pitch",
-                "ins_roll",
-                "ins_yaw",
-                "cur_com_1",
-                "cur_ac_hi",
-                "cur_ac_lo",
-                "cur_tank",
-                "cur_flap",
-                "cur_strb",
-                "cur_srvo_o",
-                "cur_srvo_m",
-                "cur_srvo_i",
-                "cur_heat",
-                "cur_acpwr",
-                "cur_outpwr",
-                "cur_bat_1",
-                "cur_bat_2",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=[
+            "flux_d_x",
+            "flux_d_y",
+            "flux_d_z",
+            "mag_5_uc",
+            "cur_com_1",
+            "cur_ac_hi",
+            "cur_ac_lo",
+            "cur_tank",
+            "cur_flap",
+            "cur_strb",
+            "cur_srvo_o",
+            "cur_srvo_m",
+            "cur_srvo_i",
+            "cur_heat",
+            "cur_acpwr",
+            "cur_outpwr",
+            "cur_bat_1",
+            "cur_bat_2",
+        ],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     tmi_with_interf = Tmi(tmi=flt_d["mag_5_uc"])
-    fom_data = DataIoC().add(
+    fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"]),
         Current[0](current=flt_d["cur_com_1"]),
         Current[1](current=flt_d["cur_ac_hi"]),
@@ -80,7 +75,6 @@ if __name__ == "__main__":
 
     expanded_terms = (
         Terms.Terms_16
-        | Cable()[0]
         | Cable()[0]
         | Cable()[1]
         | Cable()[2]

@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tests:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / ${{ matrix.install }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        install: [core, examples]
+        exclude:
+          - {os: windows-latest, python-version: "3.11"}
+          - {os: windows-latest, python-version: "3.12"}
+          - {os: windows-latest, python-version: "3.13"}
+          - {os: macos-latest, python-version: "3.11"}
+          - {os: macos-latest, python-version: "3.12"}
+          - {os: macos-latest, python-version: "3.13"}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ steps.python.outputs.python-version }}
+      - name: Install locked dependencies and project
+        env:
+          INSTALL: ${{ matrix.install }}
+        run: |
+          extras=()
+          if [[ "$INSTALL" == examples ]]; then
+            extras=(--extra examples)
+          fi
+          uv sync --locked --no-build --no-install-project "${extras[@]}"
+          uv pip install --no-deps --only-binary :all: -e .
+          uv pip check
+      - name: Check installation boundary
+        env:
+          INSTALL: ${{ matrix.install }}
+        run: |
+          uv run --no-sync python - <<'PY'
+          import os
+          from importlib import import_module
+          from importlib.util import find_spec
+
+          for module in ("dafmit_aeromag", "matplotlib", "ppigrf"):
+              if os.environ["INSTALL"] == "examples":
+                  import_module(module)
+              else:
+                  assert find_spec(module) is None, f"{module} is not a core dependency"
+          PY
+      - run: uv run --no-sync pytest
+
+  dependency-range:
+    name: Dependencies / Python ${{ matrix.python-version }} / ${{ matrix.resolution }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {python-version: "3.10", resolution: lowest-direct}
+          - {python-version: "3.10", resolution: highest}
+          - {python-version: "3.14", resolution: highest}
+    uses: ./.github/workflows/dependency-compatibility.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+      resolution: ${{ matrix.resolution }}
+
+  distributions:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ steps.python.outputs.python-version }}
+      - run: uv build
+      - name: Test installed wheel and sdist outside the checkout
+        run: |
+          for artifact in "$GITHUB_WORKSPACE"/dist/*.whl "$GITHUB_WORKSPACE"/dist/*.tar.gz; do
+            uv venv --clear "$RUNNER_TEMP/deinterf-distribution"
+            distribution_python="$RUNNER_TEMP/deinterf-distribution/bin/python"
+            uv pip install --python "$distribution_python" --only-binary :all: -r pyproject.toml pytest
+            uv pip install --python "$distribution_python" --no-deps "$artifact"
+            uv pip check --python "$distribution_python"
+            (
+              cd "$RUNNER_TEMP"
+              "$distribution_python" - <<'PY'
+          import os
+          from importlib.metadata import version
+          from pathlib import Path
+
+          import deinterf
+
+          assert deinterf.__version__ == version("deinterf")
+          assert not Path(deinterf.__file__).resolve().is_relative_to(
+              Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          )
+          PY
+              "$distribution_python" -m pytest --import-mode=importlib "$GITHUB_WORKSPACE"/tests/test_*.py
+            )
+          done

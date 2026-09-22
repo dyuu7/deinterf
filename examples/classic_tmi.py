@@ -1,30 +1,21 @@
 import matplotlib.pyplot as plt
-from sgl2020 import Sgl2020
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC
 
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
 from deinterf.foundation.sensors import MagVector, Tmi
 from deinterf.metrics.fom import improve_rate, noise_level
-from deinterf.utils.data_ioc import DataIoC
 
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_b_x",
-                "flux_b_y",
-                "flux_b_z",
-                "mag_3_uc",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=["flux_b_x", "flux_b_y", "flux_b_z", "mag_3_uc"],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     # Data preparation
     tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])
-    fom_data = DataIoC().add(
+    fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_b_x"], by=flt_d["flux_b_y"], bz=flt_d["flux_b_z"])
     )
 

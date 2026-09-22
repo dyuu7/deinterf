@@ -1,0 +1,48 @@
+name: Dependency compatibility
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        required: true
+        type: string
+      resolution:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: ${{ inputs.python-version }}
+          check-latest: true
+          allow-prereleases: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ steps.python.outputs.python-version }}
+      - name: Resolve dependencies independently of uv.lock
+        env:
+          RESOLUTION: ${{ inputs.resolution }}
+        run: |
+          uv venv
+          uv pip compile pyproject.toml --extra examples --resolution "$RESOLUTION" \
+            --only-binary :all: --output-file "$RUNNER_TEMP/deinterf-requirements.txt"
+          uv pip install --only-binary :all: -r "$RUNNER_TEMP/deinterf-requirements.txt" pytest
+          uv pip install --no-deps --only-binary :all: -e .
+          uv pip check
+      - name: Require all example dependencies
+        run: uv run --no-sync python -c "import dafmit_aeromag, matplotlib, ppigrf"
+      - run: uv run --no-sync pytest

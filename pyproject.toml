@@ -5,33 +5,37 @@ description = "Aeromagnetic interference compensation based on the Tolles–Laws
 readme = { file = "README.md", content-type = "text/markdown" }
 
 # Requirements
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
+    "dataioc[numpy]>=0.1.0,<0.2",
     "numpy>=1.26.4",
     "scipy>=1.12.0",
     "scikit-learn>=1.4.0",
     "typing-extensions>=4.10.0; python_version < '3.11'",
-    "sgl2020>=0.1.1",
-    "ppigrf>=1.0.2",
 ]
 
 # Author Info
 authors = [{ name = "dyuu7" }]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 
 # Project Classifiers
 classifiers = [
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
 
 [project.optional-dependencies]
-plot = ["matplotlib>=3.8.3"]
+examples = [
+    "dafmit-aeromag>=0.3.0,<0.4",
+    "matplotlib>=3.8.3",
+    "ppigrf>=2.1.0,<3",
+]
 
 [project.urls]
 Homepage = "https://github.com/dyuu7/deinterf"
@@ -40,27 +44,27 @@ Issues = "https://github.com/dyuu7/deinterf/issues"
 
 # Build System
 [build-system]
-requires = ["hatchling>=1.18", "hatch-vcs>=0.5"]
+requires = ["hatchling>=1.27", "hatch-vcs>=0.5"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov"]
+lint = ["ruff", "ty"]
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.version.raw-options]
-# 只在打了 vX.Y.Z 标签时产出干净版本；避免 +gHASH 本地后缀
+# Omit commit/date suffixes from development versions.
 local_scheme = "no-local-version"
-
-[tool.hatch.build.hooks.vcs]
-# 构建时写入运行时可读版本
-version-file = "deinterf/_version.py"
-
-[dependency-groups]
-dev = ["pytest", "pytest-cov"]
-lint = ["ruff", "mypy"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["deinterf"]
 include = ["deinterf/py.typed"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/.github", "/tests", "/docs", "/examples"]
+exclude = ["/.github", "/docs"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+testpaths = ["tests"]

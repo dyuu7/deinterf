@@ -1,36 +1,30 @@
-import warnings
 from datetime import datetime, timedelta
 from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import ppigrf
+from dafmit_aeromag import Dataset, Selection
+from dataioc import DataIoC, DataNDArray, UniqueData
 from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation as R
-from sgl2020 import Sgl2020
 
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
 from deinterf.foundation.sensors import DirectionalCosine, MagVector, Tmi
 from deinterf.metrics.fom import improve_rate
-from deinterf.utils.data_ioc import DataIoC, DataNDArray, UniqueData
 from deinterf.utils.transform import magvec2dircosine
-
-# Ignore pandas-related warnings from ppigrf
-warnings.filterwarnings("ignore", category=FutureWarning,
-                        message=".*'unit' keyword in TimedeltaIndex construction is deprecated.*")
 
 
 class LocationWGS84(DataNDArray, UniqueData):
-    """显式指定为唯一数据
-    """
+    """显式指定为唯一数据"""
 
     def __new__(cls, lon: ArrayLike, lat: ArrayLike, alt: ArrayLike):
         return super().__new__(cls, lon, lat, alt)
 
 
 class Date(NamedTuple):
-    """非可索引类型，默认为唯一数据
-    """
+    """非可索引类型，默认为唯一数据"""
+
     year: int  # year
     doy: int  # day of year
 
@@ -70,29 +64,25 @@ class InsDirectionalCosine(DirectionalCosine):
 
 
 if __name__ == "__main__":
-    surv_d = (
-        Sgl2020()
-        .line(["1002.02"])
-        .source(
-            [
-                "flux_d_x",
-                "flux_d_y",
-                "flux_d_z",
-                "mag_3_uc",
-                "ins_yaw",
-                "ins_pitch",
-                "ins_roll",
-                "lon",
-                "lat",
-                "utm_z",
-            ]
-        )
-        .take()
+    flt_d = Dataset().read(
+        Selection(1002, lines="1002.02"),
+        columns=[
+            "flux_d_x",
+            "flux_d_y",
+            "flux_d_z",
+            "mag_3_uc",
+            "ins_yaw",
+            "ins_pitch",
+            "ins_roll",
+            "lon",
+            "lat",
+            "utm_z",
+        ],
+        split="train",
     )
-    flt_d = surv_d["1002.02"]
 
     # date of flt1002
-    year, doy = 2020, 172
+    year, doy = int(flt_d["year"].iloc[0]), int(flt_d["doy"].iloc[0])
 
     # classic compensation
     tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])
@@ -107,7 +97,9 @@ if __name__ == "__main__":
     fom_data = DataIoC().with_data(
         Date(year=year, doy=doy),
         LocationWGS84(lon=flt_d["lon"], lat=flt_d["lat"], alt=flt_d["utm_z"]),
-        InertialAttitude[1](yaw=flt_d["ins_yaw"], pitch=flt_d["ins_pitch"], roll=flt_d["ins_roll"]),
+        InertialAttitude[1](
+            yaw=flt_d["ins_yaw"], pitch=flt_d["ins_pitch"], roll=flt_d["ins_roll"]
+        ),
         MagVector[1](bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"]),
     )
     fom_data.add_provider(DirectionalCosine, InsDirectionalCosine)
