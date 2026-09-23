@@ -16,17 +16,17 @@ from deinterf.utils.transform import magvec2dircosine
 
 
 class LocationWGS84(DataNDArray, UniqueData):
-    """显式指定为唯一数据"""
+    """Mark location data as unique."""
 
     def __new__(cls, lon: ArrayLike, lat: ArrayLike, alt: ArrayLike):
         return super().__new__(cls, lon, lat, alt)
 
 
 class Date(NamedTuple):
-    """非可索引类型，默认为唯一数据"""
+    """Non-indexable data is unique by default."""
 
-    year: int  # year
-    doy: int  # day of year
+    year: int  # Calendar year.
+    doy: int  # Day of year.
 
 
 class IGRF(DataNDArray):
@@ -34,7 +34,7 @@ class IGRF(DataNDArray):
     def __build__(cls, container: DataIoC):
         lon, lat, alt = container[LocationWGS84].T
 
-        # doy to datetime
+        # Convert day of year to a datetime.
         year, doy = container[Date]
         date = datetime(year, 1, 1) + timedelta(days=doy - 1)
 
@@ -52,8 +52,9 @@ class InertialAttitude(DataNDArray):
 class InsDirectionalCosine(DirectionalCosine):
     @classmethod
     def __build__(cls, container: DataIoC) -> DirectionalCosine:
-        att_angle = container[InertialAttitude]  # (yaw, pitch, roll): DEN
-        # DEN to ENU
+        # The input order is yaw, pitch, roll in the DEN convention.
+        att_angle = container[InertialAttitude]
+        # Convert attitude angles from DEN to ENU.
         att_angle = att_angle[:, [1, 2, 0]]
         att_angle[:, 2] = -att_angle[:, 2]
 
@@ -81,10 +82,10 @@ if __name__ == "__main__":
         split="train",
     )
 
-    # date of flt1002
+    # Extract the flight date.
     year, doy = int(flt_d["year"].iloc[0]), int(flt_d["doy"].iloc[0])
 
-    # classic compensation
+    # Run classical compensation.
     tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])
     fom_data = DataIoC().with_data(
         MagVector[1](bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"]),
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     compensator = TollesLawson(terms=Terms.Terms_16[1])
     tmi_clean_classic = compensator.fit_transform(fom_data, tmi_with_interf)
 
-    # INS based compensation
+    # Run compensation with INS-derived direction cosines.
     fom_data = DataIoC().with_data(
         Date(year=year, doy=doy),
         LocationWGS84(lon=flt_d["lon"], lat=flt_d["lat"], alt=flt_d["utm_z"]),
@@ -102,15 +103,17 @@ if __name__ == "__main__":
         ),
         MagVector[1](bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"]),
     )
+    # Use INS-derived direction cosines as the data source.
     fom_data.add_provider(DirectionalCosine, InsDirectionalCosine)
     tmi_clean_ins = compensator.fit_transform(fom_data, tmi_with_interf)
 
-    # compare
+    # Compare compensation performance.
     ir_classic = improve_rate(tmi_with_interf, tmi_clean_classic, verbose=True)
     print(f"{ir_classic=}")
     ir_ins = improve_rate(tmi_with_interf, tmi_clean_ins, verbose=True)
     print(f"{ir_ins=}")
 
+    # Plot the input and compensated signals.
     plt.plot(tmi_with_interf, label="tmi_with_interf")
     plt.plot(tmi_clean_classic, label="tmi_clean_classic")
     plt.plot(tmi_clean_ins, label="tmi_clean_ins")

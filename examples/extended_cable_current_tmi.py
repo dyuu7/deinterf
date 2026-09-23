@@ -29,6 +29,7 @@ class Cable(ComposableTerm):
 
 
 if __name__ == "__main__":
+    # Load flight data.
     flt_d = Dataset().read(
         Selection(1002, lines="1002.02"),
         columns=[
@@ -54,6 +55,7 @@ if __name__ == "__main__":
         split="train",
     )
 
+    # Prepare input data.
     tmi_with_interf = Tmi(tmi=flt_d["mag_5_uc"])
     fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"]),
@@ -73,6 +75,7 @@ if __name__ == "__main__":
         Current[13](current=flt_d["cur_bat_2"]),
     )
 
+    # Extend the T-L terms with cable-current features.
     expanded_terms = (
         Terms.Terms_16
         | Cable()[0]
@@ -91,12 +94,16 @@ if __name__ == "__main__":
         | Cable()[13]
     )
 
+    # Create a compensator with the extended terms.
     compensator = TollesLawson(terms=expanded_terms)
+    # Fit and transform in one step.
     tmi_clean = compensator.fit_transform(fom_data, tmi_with_interf)
 
+    # Evaluate compensation performance.
     ir = improve_rate(tmi_with_interf, tmi_clean, verbose=True)
     print(f"{ir=}")
 
+    # Plot the input and compensated signals.
     plt.plot(tmi_with_interf, label="tmi_with_interf")
     plt.plot(tmi_clean, label="tmi_clean")
     plt.legend()

@@ -19,7 +19,7 @@ class LoadVibration(ComposableTerm):
         dcy_derivative = np.gradient(dcy)
         dcz_derivative = np.gradient(dcz)
 
-        # Third-order directional cosine terms (10 features)
+        # Build third-order direction-cosine terms (10 features).
         triple_direction_terms = intensity[:, None] * np.column_stack(
             (
                 dcx * dcx * dcx,
@@ -35,7 +35,7 @@ class LoadVibration(ComposableTerm):
             )
         )
 
-        # Second-order directional cosine and derivative terms (18 features)
+        # Build second-order direction-cosine terms with derivatives (18 features).
         double_direction_derivative_terms = intensity[:, None] * np.column_stack(
             (
                 dcx * dcx * dcx_derivative,
@@ -59,7 +59,7 @@ class LoadVibration(ComposableTerm):
             )
         )
 
-        # First-order derivative terms (3 features)
+        # Build first-order derivative terms (3 features).
         derivative_terms = intensity[:, None] * np.column_stack(
             (
                 dcx_derivative,
@@ -78,24 +78,30 @@ class LoadVibration(ComposableTerm):
 
 
 if __name__ == "__main__":
+    # Load flight data.
     flt_d = Dataset().read(
         Selection(1002, lines="1002.02"),
         columns=["flux_d_x", "flux_d_y", "flux_d_z", "mag_5_uc"],
         split="train",
     )
 
+    # Prepare input data.
     tmi_with_interf = Tmi(tmi=flt_d["mag_5_uc"])
     fom_data = DataIoC().with_data(
         MagVector(bx=flt_d["flux_d_x"], by=flt_d["flux_d_y"], bz=flt_d["flux_d_z"])
     )
 
+    # Create a compensator with the extended terms.
     compensator = TollesLawson(terms=Terms.Terms_16 | LoadVibration())
 
+    # Fit and transform in one step.
     tmi_clean = compensator.fit_transform(fom_data, tmi_with_interf)
 
+    # Evaluate compensation performance.
     ir = improve_rate(tmi_with_interf, tmi_clean, verbose=True)
     print(f"{ir=}")
 
+    # Plot the input and compensated signals.
     plt.plot(tmi_with_interf, label="tmi_with_interf")
     plt.plot(tmi_clean, label="tmi_clean")
     plt.legend()
