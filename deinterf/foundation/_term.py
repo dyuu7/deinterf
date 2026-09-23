@@ -10,6 +10,9 @@ class ComposableTerm(DataDescriptor[np.ndarray]):
     def __or__(self, other: ComposableTerm):
         return Composition(self, other)
 
+    def __getitem__(self, index) -> ComposableTerm:
+        return self.index_explicit(index)
+
 
 class Composition(ComposableTerm):
     __slots__ = ['terms']
@@ -31,8 +34,8 @@ class Composition(ComposableTerm):
 
         self.terms = tuple(_terms)
 
-    def __getitem__(self, item):
-        return type(self)(term.index_implicit(item) for term in self.terms)
+    def __getitem__(self, index):
+        return type(self)(term.index_implicit(index) for term in self.terms)
 
     def __iter__(self):
         yield from self.terms
