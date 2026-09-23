@@ -63,8 +63,10 @@ def test_examples_run_with_real_reader_and_local_flight(
             else ("tmi_clean",)
         )
         for name in result_names:
-            assert namespace[name].shape == (400,)
-            assert np.isfinite(namespace[name]).all()
+            result = namespace[name]
+            assert isinstance(result, np.ndarray)
+            assert result.shape == (400,)
+            assert np.isfinite(result).all()
     finally:
         plt.close("all")
 
@@ -78,6 +80,7 @@ def test_readme_examples_run_with_local_flight(index, local_flight, monkeypatch)
     try:
         exec(compile(blocks[index], str(readme), "exec"), namespace)
         result = namespace.get("tmi_clean", namespace.get("tmi_clean_ins"))
+        assert isinstance(result, np.ndarray)
         assert result.shape == (400,)
         assert np.isfinite(result).all()
     finally:
