@@ -10,7 +10,14 @@ from deinterf.compensator.tmi.linear._term import (
 
 
 class Terms:
-    """磁总场补偿线性模型项"""
+    """Predefined terms for linear TMI compensation.
+
+    ``Terms_16`` combines 3 permanent, 5 induced, and 8 eddy current features.
+    ``Terms_18`` combines 3 permanent, 6 induced, and 9 eddy current features.
+    ``Induced`` and ``Eddy`` use the 5- and 8-feature variants, respectively.
+
+    Combine terms with ``|`` or select a data source with ``[index]``.
+    """
 
     Permanent = Permanent()
 

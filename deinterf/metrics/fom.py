@@ -15,20 +15,20 @@ from deinterf.utils.filter import fom_bpfilter
     prefer_skip_nested_validation=True,
 )
 def noise_level(y, sampling_rate=10):
-    """
-    计算FOM机动飞行磁测信号的噪声水平。
+    """Compute the noise level of a figure-of-merit (FOM) flight signal.
 
     Parameters
     ----------
-    y : array-like, shape of (n_samples,)
-        待计算的信号。
+    y : array-like of shape (n_samples,)
+        Magnetic field measurements.
     sampling_rate : int, default=10
-        采样率。
+        Sampling rate in Hz.
 
     Returns
     -------
     noise_level : float
-        噪声水平。
+        Standard deviation after filtering between 0.1 and 0.6 Hz, in the
+        same units as the input.
     """
     y = column_or_1d(y, dtype=np.float64)
     filtered = fom_bpfilter(y, sampling_rate=sampling_rate)
@@ -44,21 +44,24 @@ def noise_level(y, sampling_rate=10):
     prefer_skip_nested_validation=True,
 )
 def improve_rate(y_uncomp, y_comped, sampling_rate=10, verbose=False):
-    """计算FOM机动飞行磁测数据补偿前后改善比
+    """Compute the compensation improvement ratio for a FOM flight signal.
 
     Parameters
     ----------
-    y_uncomp : array-like, shape of (n_samples,)
-        未补偿的数据。
-    y_comped : array-like, shape of (n_samples,)
-        补偿后的数据。
+    y_uncomp : array-like of shape (n_samples,)
+        Magnetic field measurements before compensation.
+    y_comped : array-like of shape (n_samples,)
+        Magnetic field measurements after compensation.
     sampling_rate : int, default=10
-        采样率。
+        Sampling rate in Hz.
+    verbose : bool, default=False
+        Print the noise levels before and after compensation.
 
     Returns
     -------
     ir : float
-        改善比。
+        Noise level before compensation divided by the noise level after
+        compensation. Values greater than one indicate reduced noise.
     """
     check_consistent_length(y_uncomp, y_comped)
     y_uncomp = column_or_1d(y_uncomp, dtype=np.float64)

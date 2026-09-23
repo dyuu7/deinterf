@@ -14,21 +14,24 @@ from sklearn.utils.validation import check_array
     prefer_skip_nested_validation=True,
 )
 def fom_bpfilter(X, bandpass_range=(0.1, 0.6), sampling_rate=10):
-    """对输入的FOM飞行相关信号应用带通滤波器。
+    """Apply a bandpass filter to figure-of-merit (FOM) flight signals.
+
+    Use a Butterworth filter with forward and backward passes along the sample
+    axis to avoid phase shifts.
 
     Parameters
     ----------
-    X : array-like of shape (n_samples, n_features)
-        待滤波的输入信号。
-    bandpass_range : tuple (min_freq, max_freq), default=(0.1, 0.6)
-        滤波器的通带范围。
+    X : array-like of shape (n_samples,) or (n_samples, n_features)
+        Signals to filter, with samples along the first axis.
+    bandpass_range : tuple of float, default=(0.1, 0.6)
+        Lower and upper cutoff frequencies in Hz.
     sampling_rate : int, default=10
-        采样频率，单位Hz。
+        Sampling rate in Hz.
 
     Returns
     -------
-    filtered : array-like of shape (n_samples, n_features)
-        滤波后的信号。
+    filtered : ndarray of shape (n_samples,) or (n_samples, n_features)
+        Filtered signals with the same shape and units as the input.
     """
     X = check_array(X, copy=True, ensure_2d=False)
     b, a = butter(

@@ -13,18 +13,19 @@ from sklearn.utils.validation import check_array
     prefer_skip_nested_validation=True,
 )
 def magvec2intensity(magvec: ArrayLike, copy=True) -> ndarray:
-    """
-    根据磁矢量计算磁总场强
+    """Compute magnetic field intensity from magnetic vectors.
 
     Parameters
     ----------
     magvec : array-like of shape (n_samples, 3)
-        磁矢量数据，第二维度对应 x, y, z 三轴
+        Magnetic field components in x, y, z order.
+    copy : bool, default=True
+        Copy the input during validation.
 
     Returns
     -------
     intensity : ndarray of shape (n_samples,)
-        磁总场强数据
+        Vector magnitude for each sample, in the same units as the input.
     """
     magvec = check_array(magvec, ensure_min_features=3, copy=copy)
     return np.linalg.norm(magvec, axis=1)
@@ -38,18 +39,19 @@ def magvec2intensity(magvec: ArrayLike, copy=True) -> ndarray:
     prefer_skip_nested_validation=True,
 )
 def magvec2dircosine(magvec: ArrayLike, copy=True) -> ndarray:
-    """
-    根据磁矢量计算姿态方向余弦
+    """Compute direction cosines from magnetic vectors.
 
     Parameters
     ----------
     magvec : array-like of shape (n_samples, 3)
-        磁矢量数据，第二维度对应 x, y, z 三轴
+        Magnetic field components in x, y, z order, with nonzero magnitudes.
+    copy : bool, default=True
+        Copy the input during validation.
 
     Returns
     -------
     dir_cosine : ndarray of shape (n_samples, 3)
-        姿态方向余弦，第二维度对应 x, y, z 三轴
+        Unitless direction cosines in x, y, z order.
     """
     magvec = check_array(magvec, ensure_min_features=3, copy=copy)
 

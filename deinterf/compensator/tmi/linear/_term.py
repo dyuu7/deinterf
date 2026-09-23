@@ -8,21 +8,25 @@ from deinterf.foundation.sensors import DirectionalCosine, MagIntensity
 
 
 class Permanent(ComposableTerm):
+    """Three permanent-field features given by the direction cosines."""
+
     def __build__(self, container: DataIoC) -> DirectionalCosine:
         return container[DirectionalCosine]
 
 
 class Induced6(ComposableTerm):
+    """Six quadratic direction-cosine features scaled by field intensity."""
+
     def __build__(self, container: DataIoC) -> np.ndarray:
         intensity = container[MagIntensity]
         cos_x, cos_y, cos_z = container[DirectionalCosine].T
-        # (n,) * (n, 6) -> (n, 6)
+        # Scale all six feature columns by the intensity of each sample.
         feats = intensity[:, None] * np.column_stack(
             (
                 cos_x * cos_x,
                 cos_x * cos_y,
                 cos_x * cos_z,
-                cos_y * cos_y,  # removed in Induced_5 version
+                cos_y * cos_y,  # Omitted in Induced5.
                 cos_y * cos_z,
                 cos_z * cos_z,
             )
@@ -31,6 +35,8 @@ class Induced6(ComposableTerm):
 
 
 class Induced5(ComposableTerm):
+    """Five induced-field features, omitting the squared y direction cosine."""
+
     def __build__(self, container: DataIoC) -> np.ndarray:
         feats = container[Induced6]
         feats = np.delete(feats, feats.shape[1] // 2, 1)
@@ -38,10 +44,18 @@ class Induced5(ComposableTerm):
 
 
 class Induced(Induced5):
+    """Default induced-field term using the five-feature variant."""
+
     ...
 
 
 class Eddy9(ComposableTerm):
+    """Nine eddy current features from direction cosines and their derivatives.
+
+    Derivatives use unit sample spacing, and all features are scaled by field
+    intensity.
+    """
+
     def __build__(self, container: DataIoC) -> np.ndarray:
         intensity = container[MagIntensity]
         cos_x, cos_y, cos_z = container[DirectionalCosine].T
@@ -54,7 +68,7 @@ class Eddy9(ComposableTerm):
                 cos_x * cos_y_dot,
                 cos_x * cos_z_dot,
                 cos_y * cos_x_dot,
-                cos_y * cos_y_dot,  # removed in Eddy_8 version
+                cos_y * cos_y_dot,  # Omitted in Eddy8.
                 cos_y * cos_z_dot,
                 cos_z * cos_x_dot,
                 cos_z * cos_y_dot,
@@ -65,6 +79,8 @@ class Eddy9(ComposableTerm):
 
 
 class Eddy8(ComposableTerm):
+    """Eight eddy current features, omitting the y cosine times its derivative."""
+
     def __build__(self, container: DataIoC) -> np.ndarray:
         feats = container[Eddy9]
         feats = np.delete(feats, feats.shape[1] // 2, 1)
@@ -72,4 +88,6 @@ class Eddy8(ComposableTerm):
 
 
 class Eddy(Eddy8): 
+    """Default eddy current term using the eight-feature variant."""
+
     ...
