@@ -1,52 +1,44 @@
+"""Fit on calibration line 1002.02 and compensate repeat line 158.00.
+
+Run with: uv run --extra examples python examples/classic_tmi.py
+"""
+
 import matplotlib.pyplot as plt
 from dafmit_aeromag import Dataset, Selection
 from dataioc import DataIoC
 
 from deinterf.compensator.tmi.linear import Terms, TollesLawson
 from deinterf.foundation.sensors import MagVector, Tmi
-from deinterf.metrics.fom import improve_rate, noise_level
+from deinterf.metrics.fom import improve_rate
+
 
 if __name__ == "__main__":
-    # Load flight data.
-    flt_d = Dataset().read(
-        Selection(1002, lines="1002.02"),
-        columns=["flux_b_x", "flux_b_y", "flux_b_z", "mag_3_uc"],
-        split="train",
+    dataset = Dataset()
+    columns = ["flux_b_x", "flux_b_y", "flux_b_z", "mag_3_uc"]
+    calibration = dataset.read(
+        Selection(1002, lines="1002.02"), columns=columns, split="train"
+    )
+    survey = dataset.read(
+        Selection(1002, lines="158.00"), columns=columns, split="train"
     )
 
-    # Prepare input data.
-    tmi_with_interf = Tmi(tmi=flt_d["mag_3_uc"])
-    fom_data = DataIoC().with_data(
-        MagVector(bx=flt_d["flux_b_x"], by=flt_d["flux_b_y"], bz=flt_d["flux_b_z"])
-    )
+    def as_inputs(frame):
+        X = DataIoC().with_data(
+            MagVector(frame["flux_b_x"], frame["flux_b_y"], frame["flux_b_z"])
+        )
+        return X, Tmi(frame["mag_3_uc"])
 
-    # Create a compensator.
-    compensator = TollesLawson(terms=Terms.Terms_16)
-    # The default estimator uses cross-validated ridge regression. Replace it with
-    # another regressor when needed.
-    # from sklearn.linear_model import BayesianRidge
-    # compensator = TollesLawson(terms=Terms.Terms_16, estimator=BayesianRidge())
-    # Fit the compensator.
-    compensator.fit(fom_data, tmi_with_interf)
+    calibration_X, calibration_y = as_inputs(calibration)
+    survey_X, survey_y = as_inputs(survey)
 
-    # Transform the signal with the fitted compensator.
-    tmi_clean = compensator.transform(fom_data, tmi_with_interf)
+    model = TollesLawson(terms=Terms.Terms_16, sampling_rate=10)
+    model.fit(calibration_X, calibration_y)
+    tmi_clean = model.transform(survey_X, survey_y)
+    print(f"improvement_rate={improve_rate(survey_y, tmi_clean, sampling_rate=10):.2f}")
 
-    # Fit and transform in one step.
-    tmi_clean = compensator.fit_transform(fom_data, tmi_with_interf)
-
-    # Predict magnetic interference only.
-    interf = compensator.predict(fom_data)
-
-    # Evaluate compensation performance.
-    comped_noise_level = noise_level(tmi_clean)
-    print(f"{comped_noise_level=}")
-
-    ir = improve_rate(tmi_with_interf, tmi_clean)
-    print(f"{ir=}")
-
-    # Plot the input and compensated signals.
-    plt.plot(tmi_with_interf, label="tmi_with_interf")
-    plt.plot(tmi_clean, label="tmi_clean")
+    plt.plot(survey_y, label="uncompensated")
+    plt.plot(tmi_clean, label="compensated")
+    plt.xlabel("Sample")
+    plt.ylabel("TMI (nT)")
     plt.legend()
     plt.show()

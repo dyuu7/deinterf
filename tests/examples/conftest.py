@@ -6,18 +6,21 @@ import pytest
 
 @pytest.fixture
 def local_flight(tmp_path: Path, monkeypatch):
-    """Use the real dataset reader with a small offline calibration flight."""
+    """Use the real reader with offline calibration and survey lines."""
     import h5py
     from dafmit_aeromag import Dataset
 
-    samples = 400
+    samples_per_line = 400
+    samples = 2 * samples_per_line
     t = np.arange(samples) / 10
     bx = 20000 + 800 * np.sin(2 * np.pi * 0.17 * t)
     by = 3000 + 700 * np.cos(2 * np.pi * 0.23 * t)
     bz = 45000 + 900 * np.sin(2 * np.pi * 0.31 * t)
     fields = {
-        "line": np.full(samples, 1002.02),
-        "tt": 46380 + t,
+        "line": np.repeat([1002.02, 158.00], samples_per_line),
+        "tt": np.concatenate(
+            (46380 + t[:samples_per_line], 49320 + t[:samples_per_line])
+        ),
         "mag_3_uc": np.sqrt(bx**2 + by**2 + bz**2),
         "mag_5_uc": np.sqrt(bx**2 + by**2 + bz**2) + np.sin(t),
         "ins_yaw": 10 * np.sin(t),

@@ -1,6 +1,7 @@
 import re
 import runpy
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -71,17 +72,19 @@ def test_examples_run_with_real_reader_and_local_flight(
         plt.close("all")
 
 
-@pytest.mark.parametrize("index", [0, 1])
-def test_readme_examples_run_with_local_flight(index, local_flight, monkeypatch):
-    monkeypatch.setattr(plt, "show", lambda: None)
-    readme = Path(__file__).parents[2] / "README.md"
-    blocks = re.findall(r"```python\n(.*?)```", readme.read_text(), re.DOTALL)
-    namespace = {"__name__": "__main__"}
-    try:
-        exec(compile(blocks[index], str(readme), "exec"), namespace)
-        result = namespace.get("tmi_clean", namespace.get("tmi_clean_ins"))
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (400,)
-        assert np.isfinite(result).all()
-    finally:
-        plt.close("all")
+@pytest.mark.parametrize("readme_name", ["README.md", "README.zh-CN.md"])
+def test_readme_examples_run_with_local_flight(readme_name, local_flight):
+    readme = Path(__file__).parents[2] / readme_name
+    blocks = re.findall(
+        r"```python\n(.*?)```", readme.read_text(encoding="utf-8"), re.DOTALL
+    )
+    namespace: dict[str, Any] = {"__name__": "__main__"}
+    assert blocks, "README must contain a runnable business example"
+    for block in blocks:
+        exec(compile(block, str(readme), "exec"), namespace)
+    assert namespace["calibration"]["line"].unique().tolist() == ["1002.02"]
+    assert namespace["survey"]["line"].unique().tolist() == ["158.00"]
+    result = namespace["tmi_clean"]
+    assert isinstance(result, np.ndarray)
+    assert result.shape == (400,)
+    assert np.isfinite(result).all()
